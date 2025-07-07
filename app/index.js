@@ -14,34 +14,31 @@ import { createAdmin } from './controllers/user.controller.js';
 const app = express();
 app.use(cookieParser());
 
-
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
-app.use(express.json({ limit: '10mb' })); // or higher, e.g. '20mb'
-// Update the allowedOrigins array to include your mobile IP without trailing slash
+app.use(express.json({ limit: '10mb' }));
+
+// Update CORS for Railway
 const allowedOrigins = process.env.NODE_ENV === 'production' 
-  ? [process.env.FRONTEND_URL || 'https://boneandbone.netlify.app']
+  ? [
+      process.env.FRONTEND_URL || 'https://boneandbone.netlify.app',
+      process.env.RAILWAY_STATIC_URL ? `https://${process.env.RAILWAY_STATIC_URL}` : null
+    ].filter(Boolean)
   : [
       'http://localhost:5173', 
       'http://localhost:3000', 
-      'http://192.168.18.118:5173'  // Remove the trailing slash
+      'http://192.168.18.118:5173'
     ];
 
-// Also update CORS to be more permissive in development
 app.use(cors({
   origin: function(origin, callback) {
-    console.log('Request origin:', origin); // Debug log
+    console.log('Request origin:', origin);
     
-    // Allow requests with no origin (like mobile apps, curl requests)
     if (!origin) return callback(null, true);
     
-    // In development, be more permissive
     if (process.env.NODE_ENV !== 'production') {
-      // Allow any origin that starts with your IP
-      if (origin.startsWith('http://192.168.18.118')) {
-        return callback(null, true);
-      }
-      // Allow localhost origins
-      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      if (origin.startsWith('http://192.168.18.118') || 
+          origin.includes('localhost') || 
+          origin.includes('127.0.0.1')) {
         return callback(null, true);
       }
     }
@@ -58,9 +55,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
 
-const PORT = process.env.PORT || 3000;
+// Use Railway's PORT or default
+const PORT = process.env.PORT || 5801;
 
-// Add a test route
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Backend is working now!',
@@ -69,71 +66,44 @@ app.get('/', (req, res) => {
   });
 });
 
-
-// API Routes
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/auth', authRoutes);
 
-// Create HTTP server
 const server = createServer(app);
 
-// Create Socket.io server
 const io = new Server(server, {
   cors: {
-    origin: [
-      'http://localhost:5173',
-      'https://boneandbone.netlify.app'
-    ],
+    origin: allowedOrigins,
     credentials: true,
   }
 });
 
-
-
-
-// Initialize database connection
-let dbInitialized = false;
-
-const initializeApp = async () => {
-  if (!dbInitialized) {
-    try {
-      console.log('🌐 Initializing database connection...');
-      await connectDB();
-      console.log('✅ Database connection established');
+// Initialize database and start server
+const startServer = async () => {
+  try {
+    console.log('🌐 Initializing database connection...');
+    await connectDB();
+    console.log('✅ Database connection established');
+    
+    await createAdmin();
+    console.log('✅ Admin user ensured');
+    
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server started on port: ${PORT}`);
+      console.log(`📦 Environment: ${process.env.NODE_ENV}`);
       
-      // Create admin user after DB connection
-      await createAdmin();
-      console.log('✅ Admin user ensured');
-      
-      dbInitialized = true;
-    } catch (err) {
-      console.error('❌ Database initialization failed:', err);
-      // Don't throw error - let individual routes handle DB reconnection
-    }
+      // For Railway, log the service URL
+      if (process.env.RAILWAY_STATIC_URL) {
+        console.log(`🌍 Service URL: https://${process.env.RAILWAY_STATIC_URL}`);
+      }
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
   }
 };
 
-// Initialize on startup
-initializeApp();
+startServer();
 
-// For Vercel serverless functions
 export default app;
-
-// Start server for local development
-if (process.env.NODE_ENV !== 'production') {
-  const startServer = async () => {
-    try {
-      await initializeApp();
-
-      server.listen(PORT,'0.0.0.0', () => {
-        console.log(`🚀 Server started on port: ${PORT}`);
-        
-      });
-    } catch (error) {
-      console.error('❌ Failed to start server:', error);
-    }
-  };
-
-  startServer();
-}

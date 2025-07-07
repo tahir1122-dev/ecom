@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "type": "module",
   "main": "app/index.js",
- "scripts": {
-  "start": "node app/index.js"
-},
+  "scripts": {
+    "start": "node app/index.js",
+    "build": "echo 'Build completed'",
+    "dev": "nodemon app/index.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
