@@ -20,7 +20,7 @@ app.use(express.json({ limit: '10mb' }));
 // Update CORS for Railway
 const allowedOrigins = process.env.NODE_ENV === 'production' 
   ? [
-      process.env.FRONTEND_URL || 'https://boneandbone.netlify.app',
+      process.env.FRONTEND_URL || 'https://wolverine-house.netlify.app',
       process.env.RAILWAY_STATIC_URL ? `https://${process.env.RAILWAY_STATIC_URL}` : null
     ].filter(Boolean)
   : [
